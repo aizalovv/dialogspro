@@ -3,16 +3,21 @@ on:
   push:
     paths:
       - 'tutorials/*.mp4'
+      - 'tutorials/metadata.json'
+concurrency:
+  group: generate-json
+  cancel-in-progress: true
 jobs:
   generate-json:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Explicit write permission
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for rebase
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -23,13 +28,21 @@ jobs:
           pip install requests
       - name: Generate JSON
         run: python scripts/generate_json.py
-      - name: Commit JSON
+      - name: Commit and Push JSON
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add tutorials.json
-          git commit -m "Update tutorials.json" || echo "No changes to commit"
-          git pull --rebase origin main
+          git add tutorials.json tutorials/metadata.json
+          git commit -m "Update tutorials.json and metadata.json" blå1
+          git fetch origin
+          git rebase origin/main
+          if [ $? -ne 0 ]; then
+            echo "Rebase failed, resolving conflicts"
+            git rebase --abort
+            git pull origin main --no-rebase
+            git add tutorials.json tutorials/metadata.json
+            git commit -m "Resolve conflicts and update JSONs" || echo "No changes to commit"
+          fi
           git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
