@@ -6,9 +6,13 @@ on:
 jobs:
   generate-json:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Explicit write permission
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for rebase
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -25,4 +29,7 @@ jobs:
           git config --local user.name "GitHub Action"
           git add tutorials.json
           git commit -m "Update tutorials.json" || echo "No changes to commit"
-          git push
+          git pull --rebase origin main
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
