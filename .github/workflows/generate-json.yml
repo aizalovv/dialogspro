@@ -1,41 +1,44 @@
-name: Update Tutorials JSON
-
+name: Generate Tutorials JSON
 on:
   push:
     paths:
-      - 'tutorials/**'
-
+      - 'tutorials/*.mp4'
 jobs:
-  update-json:
+  generate-json:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Explicit write permission
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          python-version: '3.9'
-
-      - name: Install dependencies
+          fetch-depth: 0  # Fetch full history for rebase
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-
-      - name: Generate tutorials.json
-        run: |
-          python .github/scripts/generate_json.py
-
-      - name: Commit changes
+          pip install requests
+      - name: Generate JSON
+        run: python scripts/generate_json.py
+      - name: Commit and Push JSON
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          if [ -f tutorials.json ]; then
+          git add tutorials.json
+          git commit -m "Update tutorials.json" || echo "No changes to commit"
+          git fetch origin
+          git rebase origin/main
+          if [ $? -ne 0 ]; then
+            echo "Rebase failed, resolving conflicts"
+            git rebase --abort
+            git pull origin main --no-rebase
             git add tutorials.json
-            git diff-index --quiet HEAD || git commit -m "Update tutorials.json"
-            git push
-          else
-            echo "tutorials.json not found, skipping commit"
-            exit 1
+            git commit -m "Resolve conflicts and update tutorials.json" || echo "No changes to commit"
           fi
+          git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
